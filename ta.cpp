@@ -16,11 +16,10 @@ struct shared_vars{
 	char rubric[5];
 	int cur_exam;
 	int student_id;
-	int num_ta;
-	int ta_marking;
+	int num_ta; //Total number of TAs
+	int ta_marking; //Number of TAs actively marking
 	int rubric_line = 0;
 	int exam_line = 0;
-	bool loaded = false;
 };
 
 int load_exam(int& exam_num);
@@ -61,7 +60,6 @@ int main(int argc, char **argv) {
 		cerr << "Rubric couldn't be opened" << endl;
 	}
 	mem->student_id = load_exam(mem->cur_exam);
-	mem->loaded = true;
 
 	//Create desired amount of child processes
 	for (int i = 1; i < mem->num_ta; i++) {
@@ -77,11 +75,11 @@ int main(int argc, char **argv) {
 	//cout << ta_id << endl;
 	while (true){
 		
-		mem->loaded = false;
 		//Loop for reviewing rubric, uses shared variable denoting next line for coordination between processes.
 		while (mem->rubric_line < 5) {
+			usleep((getRandom(5) + 5) * 100000);
 			if (7 < getRandom(10)) {
-				mem->rubric[mem->rubric_line]++;
+				mem->rubric[mem->rubric_line] = mem->rubric[mem->rubric_line] % 65 + 66;
 				char answer = mem->rubric[mem->rubric_line];
 				cout << "TA: " << ta_id << " Exercise: " 
 					<< mem->rubric_line + 1 << " " << char(answer - 1) 
@@ -92,27 +90,28 @@ int main(int argc, char **argv) {
 		
 		//Loop for marking exams, uses shared variable denoting next line for coordination between the processes.
 		while (mem->exam_line < 5) {
+			usleep((getRandom(1) + 1) * 1000000);
 			cout << "TA: " << ta_id << " Question: " 
-				<< mem->exam_line + 1<< " Student: " 
+				<< mem->exam_line + 1 << " Student: " 
 				<< mem->student_id << endl;
 			mem->exam_line++;
 		}
 		//cout << "MARKING: " << ta_id << ", " << mem->ta_marking << endl;
-		//TA finishes execution if student id is 9999, loads the next exam otherwise.
+		//TAs finish execution if student id is 9999, loads the next exam otherwise.
 		if (mem->student_id == 9999) {
 			break;
 		}
+		//Prepare next exam if all TAs have finished
 		mem->ta_marking--;
 		if (mem->ta_marking <= 0) {
 			mem->student_id = load_exam(mem->cur_exam);
-			mem->loaded = true;
 			mem->rubric_line = 0;
 			mem->exam_line = 0;
 			mem->ta_marking = mem->num_ta;
 			//cout << "LOADED: " << ta_id << endl;
 			cout << endl;
 		} else {
-			while (mem->ta_marking > 0){};
+			while (mem->ta_marking > 0){}; //Wait for all TAs to finish marking
 		}
 	}
 

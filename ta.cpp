@@ -1,4 +1,3 @@
-#include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -6,17 +5,45 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
 
 using namespace std;
 
-string load_exam(int& exam_num);
+//This struct contains all of the variables that will be shared amongst TAs
+struct shared_vars{
+	char rubric[5];
+	int cur_exam;
+	int student_id;
+	int num_ta;
+	int ta_marking;
+	int rubric_line = 0;
+	int exam_line = 0;
+	bool loaded = false;
+};
+
+int load_exam(int& exam_num);
 
 unsigned int getRandom(unsigned int max);
 
-int main() {
+int main(int argc, char **argv) {
 
-	int cur_exam = 1;
-	char rubric[5];
+
+	//Create and attach shared memory
+	int mem_id = shmget(IPC_PRIVATE, sizeof(shared_vars), IPC_CREAT | IPC_EXCL | 0666); 
+	if (mem_id == -1) {
+		cerr << "SHMGET failed" << endl;
+	}
+	shared_vars *mem = (shared_vars *)shmat(mem_id,(char *)0, 0);
+	if (mem == (void *)-1){
+		cerr << "SHMAT failed" << endl;
+	}
+	
+	mem->num_ta = atoi(argv[1]);
+	mem->ta_marking = mem->num_ta;
+	mem->cur_exam = 1;
+
 	/*
 	 * This section reads from the rubric file and stores the answers in an array.
 	 * When the TA's 'read' and 'write' to/from the rubric they will work with this array instead of the file itself
@@ -26,58 +53,70 @@ int main() {
 		string exercise;
 		int ex_index = 0;
 		while (getline(rub, exercise)) {
-			rubric[ex_index] = exercise[2];
+			mem->rubric[ex_index] = exercise[2];
 			ex_index++;
 		}
 		rub.close();
 	} else {
 		cerr << "Rubric couldn't be opened" << endl;
 	}
-	string student_id = load_exam(cur_exam);
+	mem->student_id = load_exam(mem->cur_exam);
+	mem->loaded = true;
 
-	int rubric_line = 0;
-	int exam_line = 0;
-	bool loaded = true;
-	int ta_marking = 1;
+	//Create desired amount of child processes
+	for (int i = 1; i < mem->num_ta; i++) {
+		int pid = fork();
+		if (pid == -1) {
+			cerr << "FORK failed" << endl;
+		} else if (pid == 0) {
+			break;
+		}
+	}
+
+	int ta_id = getpid();
+	//cout << ta_id << endl;
 	while (true){
 		
-		while (!loaded){};
-		loaded = false;
+		mem->loaded = false;
 		//Loop for reviewing rubric, uses shared variable denoting next line for coordination between processes.
-		while (rubric_line < 5) {
+		while (mem->rubric_line < 5) {
 			if (7 < getRandom(10)) {
-				rubric[rubric_line]++;
-				char answer = rubric[rubric_line];
-				cout << "TA: " << 1 << " Exercise: " 
-					<< rubric_line + 1 << " " << char(answer - 1) 
+				mem->rubric[mem->rubric_line]++;
+				char answer = mem->rubric[mem->rubric_line];
+				cout << "TA: " << ta_id << " Exercise: " 
+					<< mem->rubric_line + 1 << " " << char(answer - 1) 
 					<< " -> " << answer << endl;
 			}
-			rubric_line++;
+			mem->rubric_line++;
 		}
 		
 		//Loop for marking exams, uses shared variable denoting next line for coordination between the processes.
-		while (exam_line < 5) {
-			cout << "TA: " << 1 << " Question: " 
-				<< exam_line + 1<< " Student: " 
-				<< student_id << endl;
-			exam_line++;
+		while (mem->exam_line < 5) {
+			cout << "TA: " << ta_id << " Question: " 
+				<< mem->exam_line + 1<< " Student: " 
+				<< mem->student_id << endl;
+			mem->exam_line++;
 		}
-		ta_marking--;
-
+		//cout << "MARKING: " << ta_id << ", " << mem->ta_marking << endl;
 		//TA finishes execution if student id is 9999, loads the next exam otherwise.
-		if (student_id == "9999") {
+		if (mem->student_id == 9999) {
 			break;
 		}
-		if (!loaded && ta_marking == 0) {
-			student_id = load_exam(cur_exam);
-			loaded = true;
-			rubric_line = 0;
-			exam_line = 0;
-			ta_marking = 1;
+		mem->ta_marking--;
+		if (mem->ta_marking <= 0) {
+			mem->student_id = load_exam(mem->cur_exam);
+			mem->loaded = true;
+			mem->rubric_line = 0;
+			mem->exam_line = 0;
+			mem->ta_marking = mem->num_ta;
+			//cout << "LOADED: " << ta_id << endl;
+			cout << endl;
+		} else {
+			while (mem->ta_marking > 0){};
 		}
-		cout << endl;
 	}
 
+	shmctl(mem_id, IPC_RMID, (shmid_ds *)0);
 	return EXIT_SUCCESS;
 }
 
@@ -87,7 +126,7 @@ int main() {
 * of the top of the exam pile.
 * The function increments the exam_num before returning.
 */
-string load_exam(int& exam_num) {
+int load_exam(int& exam_num) {
 	fstream exam("./exams/s" + to_string(exam_num) + ".txt");
 	string student_id;
 	if (exam.is_open()) {
@@ -98,7 +137,7 @@ string load_exam(int& exam_num) {
 		student_id = "-1";
 	}
 	exam_num++;
-	return student_id;
+	return atoi(student_id.c_str());
 }
 
 /**

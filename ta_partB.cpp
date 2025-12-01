@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
 			if (mem->rubric_line == 0) {		
 				cout << "TA: " << ta_id << " Reviewing rubric" << endl;
 			}
-			
+
             smutexWait(mem->smutex_wait, 0);
 
 			usleep((getRandom(5) + 5) * 100000);
@@ -136,12 +136,17 @@ int main(int argc, char **argv) {
 			//allow for continuation
 			smutexRelease(mem->smutex_wait, 0);
 		}
-		
+
 		//Loop for marking exams, uses shared variable denoting next line for coordination between the processes.
         while (mem->exam_line < 5) {
             smutexWait(mem->smutex_signal, 0);
+			if (mem->exam_line >= 5) {
+				smutexRelease(mem->smutex_signal, 0);
+				break;
+			}
 			int qline = mem->exam_line;
-    		mem->exam_line++;
+			mem->exam_line++;
+			smutexRelease(mem->smutex_signal, 0);
 				
 			//delay to show "marking"
 			usleep((getRandom(1) + 1) * 1000000);
@@ -169,6 +174,7 @@ int main(int argc, char **argv) {
 		}
 		 		
 		smutexRelease(mem->smutex_signal, 0);
+
 		// Wait for all TAs to finish marking and next exam to be loaded
 		bool waiting = true;
 		while(waiting){
@@ -199,9 +205,10 @@ int load_exam(int& exam_num) {
 		getline(exam, student_id);
 		exam.close();
 	} else {
-		cerr << "Exam" << to_string(exam_num) << "couldn't be opened" << endl;
-		student_id = "-1";
-	}
+		cout <<endl;
+		cout << "Exam " << to_string(exam_num) << " couldn't be opened" << endl;	}
+		cout <<endl;
+		return -1;
 	exam_num++;
 	return atoi(student_id.c_str());
 }

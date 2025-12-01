@@ -73,15 +73,18 @@ int main(int argc, char **argv) {
 
 	int ta_id = getpid();
 	//cout << ta_id << endl;
+
 	while (true){
-		
+		//Print if a ta has begun checking rubric
+		cout << endl << "TA: " << ta_id << " Reviewing rubric" << endl;
+			
 		//Loop for reviewing rubric, uses shared variable denoting next line for coordination between processes.
 		while (mem->rubric_line < 5) {
 			usleep((getRandom(5) + 5) * 100000);
 			if (7 < getRandom(10)) {
 				mem->rubric[mem->rubric_line] = mem->rubric[mem->rubric_line] % 65 + 66;
 				char answer = mem->rubric[mem->rubric_line];
-				cout << "TA: " << ta_id << " Exercise: " 
+				cout << "TA: " << ta_id << " Corrected: " 
 					<< mem->rubric_line + 1 << " " << char(answer - 1) 
 					<< " -> " << answer << endl;
 			}
@@ -91,11 +94,12 @@ int main(int argc, char **argv) {
 		//Loop for marking exams, uses shared variable denoting next line for coordination between the processes.
 		while (mem->exam_line < 5) {
 			usleep((getRandom(1) + 1) * 1000000);
-			cout << "TA: " << ta_id << " Question: " 
+			cout << "TA: " << ta_id << " Marking Question: " 
 				<< mem->exam_line + 1 << " Student: " 
 				<< mem->student_id << endl;
 			mem->exam_line++;
 		}
+		
 		//cout << "MARKING: " << ta_id << ", " << mem->ta_marking << endl;
 		//TAs finish execution if student id is 9999, loads the next exam otherwise.
 		if (mem->student_id == 9999) {
@@ -109,7 +113,6 @@ int main(int argc, char **argv) {
 			mem->exam_line = 0;
 			mem->ta_marking = mem->num_ta;
 			//cout << "LOADED: " << ta_id << endl;
-			cout << endl;
 		} else {
 			while (mem->ta_marking > 0){}; //Wait for all TAs to finish marking
 		}
@@ -150,4 +153,3 @@ unsigned int getRandom(unsigned int max)
     uniform_int_distribution<int> dist(0, max);
     return dist(gen);
 }
-

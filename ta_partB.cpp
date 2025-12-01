@@ -208,7 +208,6 @@ int load_exam(int& exam_num) {
 		cout <<endl;
 		cout << "Exam " << to_string(exam_num) << " couldn't be opened" << endl;	}
 		cout <<endl;
-		return -1;
 	exam_num++;
 	return atoi(student_id.c_str());
 }

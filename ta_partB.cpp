@@ -75,11 +75,12 @@ int main(int argc, char **argv) {
 	//cout << ta_id << endl;
 
 	while (true){
-		//Print if a ta has begun checking rubric
-		cout << endl << "TA: " << ta_id << " Reviewing rubric" << endl;
-			
 		//Loop for reviewing rubric, uses shared variable denoting next line for coordination between processes.
 		while (mem->rubric_line < 5) {
+			//Print if a ta has begun checking rubric
+			if (mem->rubric_line == 0)
+    		cout << "TA: " << ta_id << " Reviewing rubric" << endl;
+			
 			usleep((getRandom(5) + 5) * 100000);
 			if (7 < getRandom(10)) {
 				mem->rubric[mem->rubric_line] = mem->rubric[mem->rubric_line] % 65 + 66;
